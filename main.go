@@ -67,9 +67,3 @@ func JSON2CSV(fileType string, input string, output string, base string, fields 
 	extractor := extractor.NewJSONExtractor(reader, writer, base, fields)
 	extractor.Extract()
 }
-
-func main() {
-	// JSON2CSV("file", "data-8.json", "result-8.csv", ".dataset", []string{"modified", "publisher.name", "publisher.subOrganizationOf.name", "contactPoint.fn", "keyword"})
-	JSON2CSV("url", "https://open.gsa.gov/data.json", "result.csv", ".dataset", []string{"modified", "publisher.name", "publisher.subOrganizationOf.name", "contactPoint.fn", "keyword"})
-
-}
