@@ -98,7 +98,6 @@ func TestNewJSONParser(t *testing.T) {
 			if parser.NowField != "" {
 				t.Errorf("NewJSONParser() NowField = %v, want empty string", parser.NowField)
 			}
-			// Don't check buffer content since streamData() is called in NewJSONParser
 			if len(parser.buffer) == 0 && tt.input != "" && strings.TrimSpace(tt.input) != "" {
 				t.Error("NewJSONParser() buffer should not be empty for non-empty input")
 			}
@@ -188,7 +187,7 @@ func TestJSONParserStreamData(t *testing.T) {
 			}
 			p.streamData()
 			if !strings.Contains(p.buffer, tt.expected) {
-				t.Errorf("streamData() buffer = %v, want %v", p.buffer, tt.expected)
+				t.Errorf("StreamData() buffer = %v, want %v", p.buffer, tt.expected)
 			}
 		})
 	}
@@ -598,13 +597,14 @@ func TestJSONParserParse(t *testing.T) {
 			parser.Parse()
 			// fmt.Printf("Parse() = %v, want %v", result, tt.expected)
 
-			if !compareArray(result, tt.expected) {
+			if !CompareArray(result, tt.expected) {
 				t.Errorf("Parse() = %v\n, want %v", result, tt.expected)
 			}
 		})
 	}
 }
-func compareArray(result []any, expected []any) bool {
+
+func CompareArray(result []any, expected []any) bool {
 	// Check if lengths are equal
 	if len(result) != len(expected) {
 		fmt.Println("Arrays are of different lengths.")
