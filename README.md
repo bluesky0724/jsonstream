@@ -72,6 +72,12 @@ func main() {
 ### Test the project
 
 ```bash
-go test .
+go test ./...
+```
+
+Check test coverage
+
+```bash
+go test ./... -cover
 ```
 
