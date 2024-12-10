@@ -18,15 +18,15 @@ import (
 //	output: destination CSV filename, e.g: "output.csv"
 //	base: base field path where target data is stored: we assume this field is an array, e.g: ".dataset"
 //	fields: array of field names to extract relative to base path, e.g: "modified" means the absolute path of target field is ".dataset.modified"
-func JSON2CSV(fileType string, input string, output string, base string, fields []string) {
+func JSON2CSV(fileType string, input string, output string, base string, fields []string) error {
 	var reader *bufio.Reader
 
 	// Handle local file input
 	if fileType == "file" {
 		file, err := os.Open(input)
 		if err != nil {
-			fmt.Println("Error opening file:", err)
-			return
+
+			return fmt.Errorf("error opening file: %w", err)
 		}
 		defer file.Close()
 
@@ -37,25 +37,27 @@ func JSON2CSV(fileType string, input string, output string, base string, fields 
 
 		resp, err := http.Get(jsonURL)
 		if err != nil {
-			fmt.Println("Error fetching URL:", err)
-			return
+
+			return fmt.Errorf("error fetching URL: %w", err)
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("Failed to fetch data: %d\n", resp.StatusCode)
-			return
+
+			return fmt.Errorf("failed to fetch data: HTTP status %d", resp.StatusCode)
 		}
 
 		reader = bufio.NewReader(resp.Body)
+	} else {
+		return fmt.Errorf("invalid fileType: must be 'file' or 'url'")
 	}
 
 	// Create output CSV file
 	csvFilename := output
-	csvFile, csvErr := os.Create(csvFilename)
-	if csvErr != nil {
-		fmt.Println("Error creating file: ", csvErr)
-		return
+
+	csvFile, err := os.Create(csvFilename)
+	if err != nil {
+		return fmt.Errorf("error creating file: %w", err)
 	}
 	defer csvFile.Close()
 
@@ -65,5 +67,10 @@ func JSON2CSV(fileType string, input string, output string, base string, fields 
 
 	// Create and run the JSON extractor
 	extractor := extractor.NewJSONExtractor(reader, writer, base, fields)
-	extractor.Extract()
+
+	if err := extractor.Extract(); err != nil {
+		return fmt.Errorf("error extracting JSON: %w", err)
+	}
+
+	return nil
 }

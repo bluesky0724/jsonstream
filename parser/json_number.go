@@ -17,10 +17,10 @@ var JSONNumber = &JSONValueType{}
 // * Must be a valid numeric value parsable to float64
 // * Stores a primitive numeric value
 func init() {
-	JSONNumber.ParseValue = func(p *JSONParser) {
+	JSONNumber.ParseValue = func(p *JSONParser) error {
 		// Check if the current character is a valid number start (digit or minus sign)
 		if !unicode.IsDigit(rune(p.buffer[p.pos])) && p.buffer[p.pos] != '-' {
-			panic(fmt.Sprintf("unexpected character '%c' at position %d", p.buffer[p.pos], p.pos))
+			return fmt.Errorf("unexpected character '%c' at position %d", p.buffer[p.pos], p.pos)
 		}
 
 		start := p.pos
@@ -32,12 +32,20 @@ func init() {
 
 		number, err := strconv.ParseFloat(p.buffer[start:p.pos], 64)
 		if err != nil {
-			panic("invalid number")
+			return fmt.Errorf("invalid number")
 		}
 
 		// Handle the parsed number value
-		p.parseHandler(number)
+		err = p.parseHandler(number)
+		if err != nil {
+			return err
+		}
 
 		p.consume()
+
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 }

@@ -43,9 +43,12 @@ func NewJSONExtractor(reader *bufio.Reader, writer *csv.Writer, baseField string
 }
 
 // composeCSV writes the collected values to CSV and reinitializes the values map
-func (e *JSONExtractor) composeCSV() {
-	e.writeCSV(e.targets, e.values)
+func (e *JSONExtractor) composeCSV() error {
+	if err := e.writeCSV(e.targets, e.values); err != nil {
+		return fmt.Errorf("failed to write CSV: %w", err)
+	}
 	e.initValues()
+	return nil
 }
 
 // getAbsolutePath combines base path and field name to create absolute field path
@@ -64,14 +67,17 @@ func getAbsolutePath(base string, field string) string {
 // The base and targetValues are only attached in this JSONExtractor structure,
 // so actually we can even define the new JSONProcessor to handle the brand new job
 // just creating and passing parseHandler to JSONParser
-func (e *JSONExtractor) parseHandler(value any) {
+func (e *JSONExtractor) parseHandler(value any) error {
 	nowField := e.parser.NowField
 
 	if nowField == e.base+"." { // This means the parser is parsing an element in the base array
-		e.composeCSV()
+		if err := e.composeCSV(); err != nil {
+			return fmt.Errorf("failed to compose CSV: %w", err)
+		}
 	} else if e.shouldUpdate(nowField) { // This means the parser parsed the target field
 		e.updateValues(nowField, value)
 	}
+	return nil
 }
 
 // initValues reinitializes the values map with empty arrays
@@ -103,22 +109,21 @@ func (e *JSONExtractor) shouldUpdate(field string) bool {
 }
 
 // writeCSV writes the collected values to the CSV file using backtracking
-func (e *JSONExtractor) writeCSV(fields []string, values map[string][]any) {
+func (e *JSONExtractor) writeCSV(fields []string, values map[string][]any) error {
 	absolutePaths := make([]string, len(fields))
 	for i, field := range fields {
 		absolutePaths[i] = getAbsolutePath(e.base, field)
 	}
-	e.backtrack(absolutePaths, values, 0, []string{})
+	return e.backtrack(absolutePaths, values, 0, []string{})
 }
 
 // backtrack generates all possible combinations of field values for CSV rows
-func (e *JSONExtractor) backtrack(keys []string, obj map[string][]any, index int, current []string) {
+func (e *JSONExtractor) backtrack(keys []string, obj map[string][]any, index int, current []string) error {
 	if index == len(keys) {
-		err := e.writer.Write(current)
-		if err != nil {
-			fmt.Println("Error writing field values:", err)
+		if err := e.writer.Write(current); err != nil {
+			return fmt.Errorf("error writing field values: %w", err)
 		}
-		return
+		return nil
 	}
 
 	// if target field value is empty, we use ""
@@ -129,18 +134,24 @@ func (e *JSONExtractor) backtrack(keys []string, obj map[string][]any, index int
 	for _, value := range obj[keys[index]] {
 		stringValue := fmt.Sprintf("%v", value)
 		current = append(current, stringValue)
-		e.backtrack(keys, obj, index+1, current)
+		if err := e.backtrack(keys, obj, index+1, current); err != nil {
+			return err
+		}
 		current = current[:len(current)-1]
 	}
+	return nil
 }
 
 // Extract starts the JSON extraction process and writes data to CSV
-func (e *JSONExtractor) Extract() {
-	err := e.writer.Write(e.targets)
-	if err != nil {
-		fmt.Println("Error writing target fields:", err)
-		return
+func (e *JSONExtractor) Extract() error {
+	if err := e.writer.Write(e.targets); err != nil {
+		return fmt.Errorf("error writing target fields: %w", err)
 	}
-	e.parser.StreamData() // Stream data for the first time
-	e.parser.Parse()      // Start to parse the data
+	if err := e.parser.StreamData(); err != nil { // Stream data for the first time
+		return fmt.Errorf("error streaming data: %w", err)
+	}
+	if err := e.parser.Parse(); err != nil { // Start to parse the data
+		return fmt.Errorf("error parsing data: %w", err)
+	}
+	return nil
 }

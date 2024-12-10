@@ -2,6 +2,7 @@ package parser
 
 import (
 	"bufio"
+	"errors"
 	"unicode"
 )
 
@@ -12,9 +13,9 @@ const ChunkSize = 1024
 type JSONParser struct {
 	reader       *bufio.Reader
 	buffer       string
-	pos          int       // the position of the parser pointer
-	NowField     string    // the current field parser is checking
-	parseHandler func(any) // the logic the parser handles after parsing
+	pos          int             // the position of the parser pointer
+	NowField     string          // the current field parser is checking
+	parseHandler func(any) error // the logic the parser handles after parsing
 }
 
 // JSONValueType defines a type to check in JSON format
@@ -23,11 +24,11 @@ type JSONValueType struct {
 	// The object, array, string, number
 	// and the strict values like true, false, and null
 	// The parsing logic for different value types here
-	ParseValue func(p *JSONParser)
+	ParseValue func(p *JSONParser) error
 }
 
 // NewJSONParser creates a new JSON parser instance
-func NewJSONParser(reader *bufio.Reader, parseHandler func(any)) *JSONParser {
+func NewJSONParser(reader *bufio.Reader, parseHandler func(any) error) *JSONParser {
 	return &JSONParser{
 		reader:       reader,
 		buffer:       "", // initially empty string
@@ -38,12 +39,12 @@ func NewJSONParser(reader *bufio.Reader, parseHandler func(any)) *JSONParser {
 }
 
 // SetParseHandler sets the parse handler function, made to set this private parseHandler
-func (p *JSONParser) SetParseHandler(parseHandler func(any)) {
+func (p *JSONParser) SetParseHandler(parseHandler func(any) error) {
 	p.parseHandler = parseHandler
 }
 
 // StreamData reads data chunks from the reader into the buffer
-func (p *JSONParser) StreamData() {
+func (p *JSONParser) StreamData() error {
 	chunk := make([]byte, ChunkSize) // stream data by chunk size
 
 	n, err := p.reader.Read(chunk)
@@ -53,10 +54,11 @@ func (p *JSONParser) StreamData() {
 
 	if err != nil {
 		if err.Error() == "EOF" {
-			return // End of file reached
+			return nil // End of file reached
 		}
-		panic("error loading more data")
+		return errors.New("error loading more data")
 	}
+	return nil
 }
 
 // goForward appends a field or "." to the current field path
@@ -71,7 +73,7 @@ func (p *JSONParser) goBackward(field string) {
 }
 
 // Parse is the main function to parse the JSON data
-func (p *JSONParser) Parse() {
+func (p *JSONParser) Parse() error {
 	p.consume() // Skip whitespace for the first time..
 
 	// Determine the JSONValue type by comparing the initializer with the current buffer
@@ -81,23 +83,38 @@ func (p *JSONParser) Parse() {
 	case '{':
 		// Parsing object: append "." and remove it before and after parsing
 		p.goForward(".")
-		JSONObject.ParseValue(p)
+		if err := JSONObject.ParseValue(p); err != nil {
+			return err
+		}
 		p.goBackward(".")
 	case '[':
-		JSONArray.ParseValue(p)
+		if err := JSONArray.ParseValue(p); err != nil {
+			return err
+		}
 	// The other types are primitive types
 	// These ParseValue functions only move the pointer and call parseHandler with the result taken
 	case '"':
-		JSONString.ParseValue(p)
+		if err := JSONString.ParseValue(p); err != nil {
+			return err
+		}
 	case 't':
-		JSONTrue.ParseValue(p)
+		if err := JSONTrue.ParseValue(p); err != nil {
+			return err
+		}
 	case 'f':
-		JSONFalse.ParseValue(p)
+		if err := JSONFalse.ParseValue(p); err != nil {
+			return err
+		}
 	case 'n':
-		JSONNull.ParseValue(p)
+		if err := JSONNull.ParseValue(p); err != nil {
+			return err
+		}
 	default: // If no initializer is matching, we can assume the value is number
-		JSONNumber.ParseValue(p)
+		if err := JSONNumber.ParseValue(p); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // In conclusion, if this Parse function is called with the NowField as an empty string (""),
@@ -108,20 +125,26 @@ func (p *JSONParser) Parse() {
 // and should initialize the JSONParser with NewJSONParser function.
 
 // incrementPos increments the buffer position and loads more data if needed
-func (p *JSONParser) incrementPos() {
+func (p *JSONParser) incrementPos() error {
 	p.pos++
 	if p.pos >= len(p.buffer) {
-		p.StreamData() // If buffer limit is reached, load more data
+		if err := p.StreamData(); err != nil { // If buffer limit is reached, load more data
+			return err
+		}
 	}
 	// After calling this function, when we find that p.pos is smaller than buffer length
 	// We can ensure that the parser reached the end of the JSON file
+	return nil
 }
 
 // skipWhitespace skips any whitespace characters in the buffer
-func (p *JSONParser) skipWhitespace() {
+func (p *JSONParser) skipWhitespace() error {
 	for p.pos < len(p.buffer) && unicode.IsSpace(rune(p.buffer[p.pos])) {
-		p.incrementPos()
+		if err := p.incrementPos(); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
 // subtractBuffer removes processed data from the buffer
@@ -134,7 +157,10 @@ func (p *JSONParser) subtractBuffer() {
 // This function is called whenever the parsing is finished
 // After processing the value (string, number...) and the symbol ('{}' or ':'...)
 // skip all white spaces and removes all processed data
-func (p *JSONParser) consume() {
-	p.skipWhitespace()
+func (p *JSONParser) consume() error {
+	if err := p.skipWhitespace(); err != nil {
+		return err
+	}
 	p.subtractBuffer()
+	return nil
 }

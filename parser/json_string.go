@@ -9,28 +9,41 @@ package parser
 var JSONString = &JSONValueType{}
 
 func init() {
-	JSONString.ParseValue = func(p *JSONParser) {
+	JSONString.ParseValue = func(p *JSONParser) error {
 		// Skip opening quote '"'
-		p.incrementPos()
+		if err := p.incrementPos(); err != nil {
+			return err
+		}
 
 		// Track start position of string content to extract the string
 		start := p.pos
 		// Continue until closing quote is found
 		for p.buffer[p.pos] != '"' {
 			// Handle escape sequences
-			// By ignoring \ in the string. we can extract the correct string which possibly include \"
 			if p.buffer[p.pos] == '\\' {
-				p.incrementPos() // ignore \
+				if err := p.incrementPos(); err != nil {
+					return err
+				}
 			}
-			p.incrementPos() // check next byte
+			if err := p.incrementPos(); err != nil {
+				return err
+			}
 		}
 		result := p.buffer[start:p.pos]
 
 		// Process the parsed string value
-		p.parseHandler(result)
+		if err := p.parseHandler(result); err != nil {
+			return err
+		}
 
 		// Skip closing quote and consume any whitespace
-		p.incrementPos()
-		p.consume()
+		if err := p.incrementPos(); err != nil {
+			return err
+		}
+		if err := p.consume(); err != nil {
+			return err
+		}
+
+		return nil
 	}
 }
