@@ -7,7 +7,7 @@ import (
 )
 
 // ChunkSize defines the size of data chunks to read: 1kb by default
-const ChunkSize = 1024
+var ChunkSize = 1024
 
 // JSONParser represents a JSON parser with buffered reading capabilities
 type JSONParser struct {
@@ -28,14 +28,23 @@ type JSONValueType struct {
 }
 
 // NewJSONParser creates a new JSON parser instance
-func NewJSONParser(reader *bufio.Reader, parseHandler func(any) error) *JSONParser {
-	return &JSONParser{
+func NewJSONParser(reader *bufio.Reader, parseHandler func(any) error) (*JSONParser, error) {
+	parser := &JSONParser{
 		reader:       reader,
 		buffer:       "", // initially empty string
 		pos:          0,  // the position of the pointer is 0
 		NowField:     "", // no field is detected in the beginning
 		parseHandler: parseHandler,
 	}
+
+	if err := parser.streamData(); err != nil {
+		return nil, err
+	}
+	if err := parser.consume(); err != nil {
+		return nil, err
+	}
+
+	return parser, nil
 }
 
 // SetParseHandler sets the parse handler function, made to set this private parseHandler
@@ -43,8 +52,8 @@ func (p *JSONParser) SetParseHandler(parseHandler func(any) error) {
 	p.parseHandler = parseHandler
 }
 
-// StreamData reads data chunks from the reader into the buffer
-func (p *JSONParser) StreamData() error {
+// streamData reads data chunks from the reader into the buffer
+func (p *JSONParser) streamData() error {
 	chunk := make([]byte, ChunkSize) // stream data by chunk size
 
 	n, err := p.reader.Read(chunk)
@@ -128,7 +137,7 @@ func (p *JSONParser) Parse() error {
 func (p *JSONParser) incrementPos() error {
 	p.pos++
 	if p.pos >= len(p.buffer) {
-		if err := p.StreamData(); err != nil { // If buffer limit is reached, load more data
+		if err := p.streamData(); err != nil { // If buffer limit is reached, load more data
 			return err
 		}
 	}

@@ -66,7 +66,7 @@ func JSON2CSV(fileType string, input string, output string, base string, fields 
 	defer writer.Flush()
 
 	// Create and run the JSON extractor
-	extractor := extractor.NewJSONExtractor(reader, writer, base, fields)
+	extractor, err := extractor.NewJSONExtractor(reader, writer, base, fields)
 
 	if err := extractor.Extract(); err != nil {
 		return fmt.Errorf("error extracting JSON: %w", err)

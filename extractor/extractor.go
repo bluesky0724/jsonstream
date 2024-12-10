@@ -18,8 +18,12 @@ type JSONExtractor struct {
 }
 
 // NewJSONExtractor creates a new JSONExtractor instance
-func NewJSONExtractor(reader *bufio.Reader, writer *csv.Writer, baseField string, fields []string) *JSONExtractor {
-	parser := parser.NewJSONParser(reader, nil)
+func NewJSONExtractor(reader *bufio.Reader, writer *csv.Writer, baseField string, fields []string) (*JSONExtractor, error) {
+	parser, err := parser.NewJSONParser(reader, nil)
+
+	if err != nil {
+		return nil, err
+	}
 
 	// Initialize map with the absolute paths of target fields
 	targetValues := make(map[string][]any)
@@ -39,7 +43,7 @@ func NewJSONExtractor(reader *bufio.Reader, writer *csv.Writer, baseField string
 	// The logic to extract and export the target data is passed to parser as a parseHandler
 	parser.SetParseHandler(extractor.parseHandler)
 
-	return extractor
+	return extractor, nil
 }
 
 // composeCSV writes the collected values to CSV and reinitializes the values map
@@ -146,9 +150,6 @@ func (e *JSONExtractor) backtrack(keys []string, obj map[string][]any, index int
 func (e *JSONExtractor) Extract() error {
 	if err := e.writer.Write(e.targets); err != nil {
 		return fmt.Errorf("error writing target fields: %w", err)
-	}
-	if err := e.parser.StreamData(); err != nil { // Stream data for the first time
-		return fmt.Errorf("error streaming data: %w", err)
 	}
 	if err := e.parser.Parse(); err != nil { // Start to parse the data
 		return fmt.Errorf("error parsing data: %w", err)
