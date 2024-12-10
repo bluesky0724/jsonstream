@@ -41,7 +41,7 @@ func init() {
 			return err
 		}
 
-		p.consume()
+		err = p.consume()
 
 		if err != nil {
 			return err
